@@ -4,6 +4,7 @@
 #include <hdf5.h>
 #include <Rinternals.h>    
 #include <R.h>
+#include <stdio.h>
 
 #define DEBUG 0
 #define HID(argname) (((h5_holder*) R_ExternalPtrAddr(argname))->id)
@@ -16,7 +17,19 @@ typedef struct h5_holder {
     hid_t id;
 } h5_holder;
 
+void blosc_init(void) {
+    char *version, *date;
+    int r;
+    r = register_blosc(&version, &date);
 
+    #ifdef BLOSC_DEBUG
+    printf("Blosc version info: %s (%s)\n", version, date);
+    #endif
+
+    if (r == 0) {
+        fprintf(stderr, "h5_wrap.c) BLOSC IMPORT FAILED");
+    }
+}
 
 void h5R_finalizer(SEXP h5_obj) {
     h5_holder* h = (h5_holder*) R_ExternalPtrAddr(h5_obj);
@@ -69,6 +82,11 @@ SEXP h5R_flush(SEXP h5_file) {
 }
 
 SEXP h5R_open(SEXP filename, SEXP mode) {
+    // TODO: we probably should only be calling the init function once, on the
+    // import of the library in R, but I wasnt't sure how to do that. Instead,
+    // we just call it once before every open
+    blosc_init();
+
     int _mode_ = (INTEGER(mode)[0] == 1) ? H5F_ACC_RDWR : H5F_ACC_RDONLY;
     return _h5R_make_holder(H5Fopen(NM(filename), _mode_, H5P_DEFAULT), 1);
 }
